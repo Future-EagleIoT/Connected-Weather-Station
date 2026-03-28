@@ -1,100 +1,116 @@
 # Connected Weather Station 🌦️
 
-An ESP32-based environmental monitoring station that reads temperature, humidity, pressure, and light data from BME280 and BH1750 sensors, then publishes readings over MQTT in real time.
+A production-ready IoT environmental monitoring system. ESP32 sensors capture temperature, humidity, pressure, and light data, transmit securely via HTTPS to a FastAPI backend, store in PostgreSQL, and visualize on a real-time React dashboard.
 
 ## Architecture
 
-See the full architecture documentation with diagrams → [docs/architecture.md](docs/architecture.md)
-
 ```
-ESP32 ──I2C──▶ BME280 (Temp / Humidity / Pressure)
-  │            BH1750 (Light)
-  │
-  └──WiFi / MQTT──▶ Broker (HiveMQ) ──▶ Dashboard / Subscriber
+ESP32 + BME280 + BH1750
+    │
+    └──HTTPS POST (TLS + API Key)──▶ FastAPI Backend ──▶ PostgreSQL
+                                          │
+                                     JWT Auth
+                                          │
+                                     React Dashboard ◀── Nginx
 ```
 
-## Hardware
+## Tech Stack
 
-| Component       | Purpose                                |
-| --------------- | -------------------------------------- |
-| ESP32 DevKit v1 | Microcontroller                        |
-| BME280          | Temperature, humidity, pressure sensor |
-| BH1750          | Ambient light sensor                   |
+| Layer | Technology |
+|-------|-----------|
+| **IoT** | ESP32 · BME280 · BH1750 · Arduino (PlatformIO) |
+| **Backend** | FastAPI · SQLAlchemy (async) · Pydantic · PostgreSQL |
+| **Frontend** | React · Vite · TailwindCSS · Recharts |
+| **Security** | JWT · bcrypt · API Keys · TLS · Rate Limiting |
+| **Infrastructure** | Docker Compose · Nginx · GCP Cloud Run ready |
 
-### Wiring
+## Features
 
-| ESP32 Pin     | Connects To            |
-| ------------- | ---------------------- |
-| GPIO 21 (SDA) | BME280 SDA, BH1750 SDA |
-| GPIO 22 (SCL) | BME280 SCL, BH1750 SCL |
-| 3.3V          | BME280 VCC, BH1750 VCC |
-| GND           | BME280 GND, BH1750 GND |
+- 🔐 **Secure data ingestion** — API key auth + HTTPS from ESP32
+- 📊 **Real-time dashboard** — Auto-refreshing charts with trend indicators
+- 🛡️ **JWT authentication** — Protected dashboard with admin roles
+- ⚡ **Rate limiting** — Per-device and per-user request throttling
+- 📱 **Responsive design** — Mobile-friendly dark-mode UI
+- 🐳 **One-command deploy** — Full stack with `docker compose up`
+- 📡 **Device management** — Register/deactivate stations from the dashboard
+
+## Quick Start
+
+```bash
+# Clone and start
+git clone https://github.com/EagleIoT/Connected-Weather-Station.git
+cd Connected-Weather-Station
+cp .env.example .env
+docker compose up --build
+
+# Access
+# Dashboard: http://localhost
+# API Docs:  http://localhost:8000/docs
+# Login:     admin@eagle-iot.com / admin123
+```
 
 ## Project Structure
 
 ```
-├── platformio.ini          # Build config & library deps
-├── include/
-│   ├── config.h            # WiFi, MQTT, pin & timing constants
-│   ├── sensors.h           # Sensor interface
-│   ├── wifi_manager.h      # WiFi functions
-│   └── mqtt_client.h       # MQTT functions
-├── src/
-│   ├── main.cpp            # Entry point
-│   ├── sensors.cpp         # BME280 & BH1750 logic
-│   ├── wifi_manager.cpp    # WiFi connect / reconnect
-│   └── mqtt_client.cpp     # MQTT connect / publish
-└── docs/
-    ├── architecture.md     # Architecture diagrams
-    └── wiring_diagram.png  # Hardware wiring schematic
+├── iot/                    # ESP32 firmware (PlatformIO)
+│   ├── include/            # Headers + config
+│   ├── src/                # Source code
+│   └── platformio.ini      # Build config
+├── backend/                # FastAPI REST API
+│   ├── app/
+│   │   ├── models/         # SQLAlchemy ORM models
+│   │   ├── schemas/        # Pydantic validation
+│   │   ├── routers/        # API endpoints
+│   │   ├── middleware/      # Rate limiting
+│   │   └── utils/          # JWT, hashing, logging
+│   ├── alembic/            # Database migrations
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/               # React dashboard
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── pages/          # Login, Dashboard, Devices
+│   │   ├── context/        # Auth state management
+│   │   └── api/            # Axios API client
+│   ├── Dockerfile
+│   └── nginx.conf
+├── docs/                   # Documentation
+│   ├── setup.md            # Full setup guide
+│   └── api.md              # API reference
+├── docker-compose.yml      # Full stack orchestration
+└── .env.example            # Environment template
 ```
 
-## Quick Start
+## Hardware
 
-### Prerequisites
+| Component | Purpose |
+|-----------|---------|
+| ESP32 DevKit v1 | Microcontroller |
+| BME280 | Temperature, humidity, pressure |
+| BH1750 | Ambient light intensity |
 
-- [PlatformIO](https://platformio.org/install) (CLI or VS Code extension)
+### Wiring
 
-### Setup
+| ESP32 Pin | Connects To |
+|-----------|-------------|
+| GPIO 21 (SDA) | BME280 SDA, BH1750 SDA |
+| GPIO 22 (SCL) | BME280 SCL, BH1750 SCL |
+| 3.3V | VCC |
+| GND | GND |
 
-1. **Clone the repository**
+## Documentation
 
-   ```bash
-   git clone https://github.com/EagleIoT/Connected-Weather-Station.git
-   cd Connected-Weather-Station
-   ```
+- [Setup Guide](docs/setup.md) — Installation, configuration, deployment
+- [API Reference](docs/api.md) — All endpoints with examples
 
-2. **Configure credentials** — edit `include/config.h`
+## Security
 
-   ```cpp
-   #define WIFI_SSID     "your_network"
-   #define WIFI_PASSWORD "your_password"
-   ```
-
-3. **Build & upload**
-
-   ```bash
-   pio run --target upload
-   ```
-
-4. **Monitor serial output**
-
-   ```bash
-   pio device monitor
-   ```
-
-## MQTT Payload
-
-Published to `iot/station_meteo/data` every 60 seconds:
-
-```json
-{
-  "temperature": 23.5,
-  "humidity": 45.2,
-  "pressure": 1013.25,
-  "lux": 350.0
-}
-```
+- **Data in transit**: TLS/HTTPS for all communication
+- **Device auth**: Unique API keys per ESP32 station
+- **User auth**: JWT tokens with bcrypt password hashing
+- **Rate limiting**: Prevents abuse (100 req/min devices, 30 req/min dashboard)
+- **Input validation**: Pydantic schemas with physical range checks
+- **Secrets management**: Environment variables, never committed to git
 
 ## License
 
