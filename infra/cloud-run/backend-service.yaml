@@ -1,0 +1,51 @@
+# ============================================================
+#  GCP Cloud Run — Backend Service Configuration
+#  Deploy with: gcloud run services replace infra/cloud-run/backend-service.yaml
+# ============================================================
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: weather-station-api
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/cpu-throttling: "true"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+        - image: gcr.io/PROJECT_ID/weather-station-api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: database-url
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: jwt-secret-key
+            - name: DEBUG
+              value: "false"
+            - name: CORS_ORIGINS
+              value: '["https://weather.eagle-iot.com"]'
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 10
