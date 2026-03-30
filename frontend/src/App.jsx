@@ -1,7 +1,3 @@
-// ============================================================
-//  App — Root component with routing and auth protection
-// ============================================================
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
@@ -14,9 +10,8 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-primary)' }}>
-        <div className="w-12 h-12 border-3 rounded-full animate-spin"
-             style={{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-accent-blue)' }} />
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="w-12 h-12 border-3 border-outline-variant border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
@@ -29,9 +24,8 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-primary)' }}>
-        <div className="w-12 h-12 border-3 rounded-full animate-spin"
-             style={{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-accent-blue)' }} />
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="w-12 h-12 border-3 border-outline-variant border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
