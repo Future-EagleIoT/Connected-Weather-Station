@@ -2,51 +2,72 @@
 //  Devices Page — List and register ESP32 weather stations
 // ============================================================
 
-import { useState, useEffect } from 'react';
-import { getDevices, createDevice } from '../api/client';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { createDevice, deactivateDevice, getDevices } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+
+const MotionDiv = motion.div;
 
 export default function Devices() {
   const { user } = useAuth();
-  const [devices, setDevices] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
   const [newKey, setNewKey] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    getDevices()
-      .then((res) => setDevices(res.data))
-      .catch(() => setError('Failed to load devices'))
-      .finally(() => setLoading(false));
-  }, []);
+  const [search, setSearch] = useState('');
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    setFormLoading(true);
-    setError('');
+  const devicesQuery = useQuery({
+    queryKey: ['devices'],
+    queryFn: async () => (await getDevices()).data,
+  });
 
-    try {
-      const res = await createDevice(name, location || null);
+  const filteredDevices = useMemo(() => {
+    const list = devicesQuery.data ?? [];
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter((d) => `${d.name ?? ''} ${d.location ?? ''} ${d.id ?? ''}`.toLowerCase().includes(q));
+  }, [devicesQuery.data, search]);
+
+  const createMutation = useMutation({
+    mutationFn: async ({ name, location }) => createDevice(name, location),
+    onSuccess: (res) => {
       setNewKey(res.data.api_key);
-      setDevices((prev) => [res.data, ...prev]);
       setName('');
       setLocation('');
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create device');
-    } finally {
-      setFormLoading(false);
-    }
+      setError('');
+      devicesQuery.refetch();
+    },
+    onError: (err) => setError(err.response?.data?.detail || 'Failed to create device'),
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (deviceId) => deactivateDevice(deviceId),
+    onSuccess: () => {
+      setError('');
+      devicesQuery.refetch();
+    },
+    onError: (err) => setError(err.response?.data?.detail || 'Failed to deactivate device'),
+  });
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    setError('');
+    createMutation.mutate({ name, location: location || null });
   };
 
-  if (loading) {
+  const handleDeactivate = (deviceId) => {
+    setError('');
+    deactivateMutation.mutate(deviceId);
+  };
+
+  if (devicesQuery.isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="w-12 h-12 border-3 rounded-full animate-spin"
-             style={{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-accent-blue)' }} />
+        <div className="w-12 h-12 border-4 rounded-full animate-spin" style={{ borderColor: 'var(--color-border)', borderTopColor: 'var(--color-accent-blue)' }} />
       </div>
     );
   }
@@ -61,20 +82,35 @@ export default function Devices() {
             Manage your ESP32 weather stations
           </p>
         </div>
-        {user?.is_admin && (
-          <button
-            onClick={() => { setShowForm(!showForm); setNewKey(''); }}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-cyan))' }}
-            onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-            onMouseLeave={(e) => e.target.style.transform = 'none'}
-          >
-            + Add Device
-          </button>
-        )}
+
+        <div className="flex flex-col sm:items-end gap-3 sm:flex-row">
+          <div className="w-full sm:w-72">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search devices..."
+              className="w-full rounded-xl px-4 py-3 text-sm outline-none"
+              style={{ background: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+            />
+          </div>
+
+          {user?.is_admin ? (
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                setNewKey('');
+                setError('');
+              }}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-cyan))' }}
+            >
+              + Add Device
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {error && (
+      {error ? (
         <div className="glass-card px-5 py-4 text-sm" style={{
           background: 'rgba(244, 63, 94, 0.1)',
           color: 'var(--color-accent-rose)',
@@ -82,11 +118,11 @@ export default function Devices() {
         }}>
           {error}
         </div>
-      )}
+      ) : null}
 
       {/* New device form */}
       {showForm && (
-        <div className="glass-card p-6 animate-fade-in" style={{ opacity: 0 }}>
+        <MotionDiv initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="glass-card p-6">
           <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>
             Register New Device
           </h3>
@@ -132,62 +168,105 @@ export default function Devices() {
                 onFocus={(e) => e.target.style.borderColor = 'var(--color-accent-blue)'}
                 onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
               />
-              <button type="submit" disabled={formLoading}
+              <button type="submit" disabled={createMutation.isPending}
                 className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
                 style={{ background: 'linear-gradient(135deg, var(--color-accent-blue), var(--color-accent-cyan))' }}>
-                {formLoading ? 'Creating...' : 'Create'}
+                {createMutation.isPending ? 'Creating...' : 'Create'}
               </button>
             </form>
           )}
-        </div>
+        </MotionDiv>
       )}
 
       {/* Device list */}
-      <div className="grid gap-4">
-        {devices.length === 0 ? (
-          <div className="glass-card p-12 text-center">
-            <p className="text-4xl mb-4">📡</p>
-            <h3 className="font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>No devices yet</h3>
-            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Register your first ESP32 weather station to get started.
-            </p>
+      {filteredDevices.length === 0 ? (
+        <div className="glass-card p-12 text-center">
+          <p className="text-4xl mb-4">📡</p>
+          <h3 className="font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>No devices found</h3>
+          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            {user?.is_admin ? 'Register your first ESP32 weather station to get started.' : 'Ask your administrator to register a device.'}
+          </p>
+        </div>
+      ) : (
+        <div className="glass-card overflow-hidden">
+          <div className="grid grid-cols-12 gap-2 px-5 py-3 text-xs font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="col-span-5">Device</div>
+            <div className="col-span-3">Status</div>
+            <div className="col-span-2 hidden md:block">Registered</div>
+            <div className="col-span-2 text-right">Actions</div>
           </div>
-        ) : (
-          devices.map((device, i) => (
-            <div key={device.id} className={`glass-card p-5 flex items-center gap-4 animate-fade-in delay-${i + 1}`}
-                 style={{ opacity: 0 }}>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0"
-                   style={{
-                     background: device.is_active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                     color: device.is_active ? 'var(--color-accent-emerald)' : 'var(--color-accent-rose)',
-                   }}>
-                📡
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                    {device.name}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium"
+          <div>
+            {filteredDevices.map((device) => {
+              const active = !!device.is_active;
+              return (
+                <MotionDiv
+                  key={device.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="grid grid-cols-12 gap-2 px-5 py-4"
+                  style={{ borderTop: '1px solid rgba(195, 198, 215, 0.25)' }}
+                >
+                  <div className="col-span-5 min-w-0 flex items-center gap-3">
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
+                      style={{
+                        background: active ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                        color: active ? 'var(--color-accent-emerald)' : 'var(--color-accent-rose)',
+                      }}
+                    >
+                      📡
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                        {device.name}
+                      </h3>
+                      <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                        {device.location || 'No location set'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-3 flex items-center">
+                    <span
+                      className="px-3 py-1 rounded-full text-xs font-semibold"
+                      style={{
+                        background: active ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+                        color: active ? 'var(--color-accent-emerald)' : 'var(--color-accent-rose)',
+                        border: `1px solid ${active ? 'rgba(16,185,129,0.25)' : 'rgba(244,63,94,0.25)'}`,
+                      }}
+                    >
+                      {active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 hidden md:block text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    {device.created_at ? new Date(device.created_at).toLocaleDateString() : '—'}
+                  </div>
+
+                  <div className="col-span-2 text-right">
+                    {user?.is_admin ? (
+                      <button
+                        type="button"
+                        disabled={!active || deactivateMutation.isPending}
+                        onClick={() => handleDeactivate(device.id)}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                         style={{
-                          background: device.is_active ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                          color: device.is_active ? 'var(--color-accent-emerald)' : 'var(--color-accent-rose)',
-                        }}>
-                    {device.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                  {device.location || 'No location set'} • Registered {new Date(device.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="text-xs font-mono px-3 py-1.5 rounded-lg shrink-0 hidden sm:block"
-                   style={{ background: 'var(--color-bg-primary)', color: 'var(--color-text-muted)' }}>
-                {device.id?.slice(0, 8)}...
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                          background: active ? 'rgba(244, 63, 94, 0.1)' : 'rgba(148, 163, 184, 0.08)',
+                          color: active ? 'var(--color-accent-rose)' : 'var(--color-text-muted)',
+                          border: `1px solid ${active ? 'rgba(244,63,94,0.25)' : 'rgba(148,163,184,0.25)'}`,
+                        }}
+                      >
+                        {deactivateMutation.isPending ? 'Updating...' : 'Deactivate'}
+                      </button>
+                    ) : null}
+                  </div>
+                </MotionDiv>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -30,7 +30,13 @@ export default function AuthLayout({ children }) {
             className="w-full h-full object-cover opacity-20 mix-blend-multiply grayscale"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYvZ6nW5oraRbiKkqvRs5cqxyvQlSARcYtCAvUL38iZACi3KII03vlJNjhYhB1G_UVJiVnXAEShOk93dhm8mcai9msMNbztt4vCDaAaUNKhGA13CYCYE9uoZ5MdUiIVMxD71f3QOpgEiEtHzskdp8lZYcy20xBso-7iQpq3O-5MIM69ZDP3ank6mqbfz9ZoN35zoKHwV_9vRbs_zxdXna34dCuvDhOyCvwLSmtCNteJdu2oAXHDNz0rZEC3Nz3uDj675yB8ZRUTWg"
           />
-          <div className="absolute inset-0 bg-linear-to-tr from-surface-container-low via-transparent to-transparent" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(120deg, var(--color-surface-container-low) 0%, rgba(243, 244, 245, 0) 55%, rgba(243, 244, 245, 0) 100%)',
+              opacity: 0.5,
+            }}
+          />
         </div>
 
         {/* Stats/Labeling Area */}

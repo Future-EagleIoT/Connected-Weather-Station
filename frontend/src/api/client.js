@@ -56,4 +56,7 @@ export const getDevices = () =>
 export const createDevice = (name, location) =>
   api.post('/api/v1/devices', { name, location });
 
+export const deactivateDevice = (deviceId) =>
+  api.patch(`/api/v1/devices/${deviceId}/deactivate`);
+
 export default api;

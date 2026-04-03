@@ -6,10 +6,12 @@ export default function StatsCard({ title, value, unit, icon, color, trend, dela
   const trendColor = trend > 0 ? 'var(--color-accent-emerald)' : trend < 0 ? 'var(--color-accent-rose)' : 'var(--color-text-muted)';
   const trendIcon = trend > 0 ? '↑' : trend < 0 ? '↓' : '→';
 
+  const animationDelayMs = Math.max(0, delay * 120);
+
   return (
     <div
-      className={`glass-card p-6 animate-fade-in delay-${delay}`}
-      style={{ opacity: 0 }}
+      className="glass-card p-6 animate-fade-in"
+      style={{ opacity: 0, animationDelay: `${animationDelayMs}ms` }}
     >
       <div className="flex items-start justify-between mb-4">
         <div

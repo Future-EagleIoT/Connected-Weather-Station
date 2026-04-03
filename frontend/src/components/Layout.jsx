@@ -14,7 +14,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-mesh" style={{ background: 'var(--color-bg-primary)' }}>
+    <div className="flex h-screen overflow-hidden bg-mesh">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r"
              style={{ background: 'var(--color-bg-secondary)', borderColor: 'var(--color-border)' }}>
